@@ -43,6 +43,7 @@ impl Drop for Logger {
 }
 
 impl Logger {
+    /// Spawn a logger thread which monitors all received messages from its clones
     pub fn initialize(config: &LoggerSettings) -> Self {
         let mut file = if let Some(path) = &config.log_to_file {
             let f = File::options()
@@ -108,7 +109,11 @@ impl Logger {
                 level,
                 timestamp: Utc::now(),
             };
-            self.log_chan.as_ref().unwrap().send(msg).unwrap();
+            if let Some(sender) = self.log_chan.as_ref() {
+                sender
+                    .send(msg)
+                    .expect("Receiver should have never hung up");
+            }
         }
     }
 
