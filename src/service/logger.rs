@@ -5,11 +5,11 @@ use std::io::Write;
 use std::sync::mpsc;
 use std::thread;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+/// Multi-threaded logger. Clone it to move into new spawned thread.
 pub struct Logger {
     log_conf: LoggerSettings,
     log_chan: Option<mpsc::Sender<LoggerMsg>>,
-    log_thread: Option<thread::JoinHandle<()>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,13 +36,9 @@ pub struct LoggerSettings {
 
 impl Drop for Logger {
     fn drop(&mut self) {
-        // TODO rm
-        dbg!("Shutting down logger...");
+        // TODO rm log
+        println!("Shutting down logger...");
         drop(self.log_chan.take());
-
-        if let Some(thread) = self.log_thread.take() {
-            thread.join().unwrap();
-        }
     }
 }
 
@@ -60,7 +56,10 @@ impl Logger {
         };
         let log_to_stderr = config.log_to_stderr;
         let (sender, receiver) = mpsc::channel();
-        let log_thread = thread::spawn(move || loop {
+        // If the join handle is dropped, the spawned thread will implicitly be detached.
+        // In this case, the spawned thread may no longer be joined.
+        // TODO is it ok to detach log thread here?
+        thread::spawn(move || loop {
             let try_recv = receiver.recv();
             match try_recv {
                 Ok(msg) => {
@@ -74,8 +73,8 @@ impl Logger {
                     }
                 }
                 Err(_) => {
-                    // TODO rm
-                    dbg!("Logger disconnected, shutting down...");
+                    // TODO rm log
+                    println!("Logger disconnected, stopping logger thread...");
                     break;
                 }
             }
@@ -83,7 +82,6 @@ impl Logger {
         Logger {
             log_conf: config.clone(),
             log_chan: Some(sender),
-            log_thread: Some(log_thread),
         }
     }
 
@@ -95,7 +93,6 @@ impl Logger {
                 log_level_starting_from: LogLevel::Error,
             },
             log_chan: None,
-            log_thread: None,
         }
     }
 
