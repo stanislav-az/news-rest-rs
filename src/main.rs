@@ -19,5 +19,6 @@ fn main() {
         thread_logger.log_info("Hello from another threeeaad!");
         thread::sleep(Duration::from_secs(1));
     });
+    logger.log_debug("Joining thread");
     thread.join().unwrap();
 }

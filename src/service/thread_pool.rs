@@ -43,7 +43,11 @@ impl ThreadPool {
     {
         let job = Box::new(f);
 
-        self.sender.as_ref().unwrap().send(job).unwrap();
+        self.sender
+            .as_ref()
+            .unwrap()
+            .send(job)
+            .expect("Receiver should have never hung up");
     }
 }
 
@@ -55,7 +59,7 @@ impl Drop for ThreadPool {
             println!("Shutting down worker {}", worker.id);
 
             if let Some(thread) = worker.thread.take() {
-                thread.join().unwrap();
+                thread.join().expect("Associated worker thread panicked");
             }
         }
     }
@@ -69,7 +73,10 @@ struct Worker {
 impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         let thread = thread::spawn(move || loop {
-            let message = receiver.lock().unwrap().recv();
+            let message = receiver
+                .lock()
+                .expect("Another worker panicked while holding the mutex")
+                .recv();
 
             match message {
                 Ok(job) => {
