@@ -29,11 +29,8 @@ fn handle_connection(mut stream: TcpStream) {
     let request: Vec<String> = lines.take_while(|line| !line.is_empty()).collect();
 
     println!("New request: {:#?}", &request);
-    let parsed_req = parse_request(&request);
+    let parsed_req = parse_request(&request, &mut buf_reader);
     println!("Parsed request: {:#?}", parsed_req);
-    let req_body: Vec<_> = buf_reader.bytes().map(Result::unwrap).take(18).collect();
-    // let x: String = req_body.into();
-    println!("Request body: {:?}", String::from_utf8(req_body));
 
     let response = "HTTP/1.1 200 OK\r\n\r\n";
     stream.write_all(response.as_bytes()).unwrap();
@@ -45,6 +42,7 @@ pub struct Request {
     pub method: Method,
     pub uri: URI,
     pub headers: Headers,
+    pub body: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,7 +57,11 @@ pub enum Method {
 pub type URI = Vec<String>;
 pub type Headers = HashMap<String, String>;
 
-fn parse_request(req_lines: &Vec<String>) -> Option<Request> {
+// TODO propagate errors into result instead of option
+fn parse_request(
+    req_lines: &Vec<String>,
+    buffer: &mut BufReader<&mut TcpStream>,
+) -> Option<Request> {
     let first_line: Vec<_> = req_lines.get(0)?.split(' ').collect();
     let method: Method = match *first_line.get(0)? {
         "GET" => Some(Method::GET),
@@ -86,9 +88,23 @@ fn parse_request(req_lines: &Vec<String>) -> Option<Request> {
         .flatten()
         .collect();
 
+    let content_length = match headers.get("Content-Length") {
+        Some(v) => v.parse::<usize>().ok(),
+        None => None,
+    };
+
+    let body = match content_length {
+        Some(l) => {
+            let req_body: Vec<u8> = buffer.bytes().map(Result::unwrap).take(l).collect();
+            String::from_utf8(req_body).ok()
+        }
+        None => None,
+    };
+
     Some(Request {
         method,
         uri,
         headers,
+        body,
     })
 }
