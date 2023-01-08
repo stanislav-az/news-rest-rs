@@ -3,13 +3,14 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream}, sync::Arc,
+    net::{TcpListener, TcpStream},
+    sync::Arc,
 };
 
 type Application = Arc<dyn Fn(Request) -> Response + Send + Sync>;
 
-pub fn run_server(application: Application)
-    {
+// TODO add server config with thread pool size and host, port
+pub fn run_server(application: Application) {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(4);
 
@@ -24,23 +25,18 @@ pub fn run_server(application: Application)
     }
 }
 
-fn handle_connection(mut stream: TcpStream, application: Application)
-    {
+// TODO rm debug logs and unwrap calls
+fn handle_connection(mut stream: TcpStream, application: Application) {
     let mut buf_reader = BufReader::new(&mut stream);
-    let lines = buf_reader
-        .by_ref()
-        .lines()
-        .map(|e| e.expect("Expected UTF-8 string"));
-    let request: Vec<String> = lines.take_while(|line| !line.is_empty()).collect();
-
-    println!("New request: {:#?}", &request);
-    let parsed_req = parse_request(&request, &mut buf_reader);
+    let parsed_req = parse_request(&mut buf_reader);
     println!("Parsed request: {:#?}", parsed_req);
 
     let resp = application(parsed_req.unwrap());
     let length = resp.body.len();
-    let response =
-        format!("HTTP/1.1 {} {}\r\nContent-Length: {}\r\n\r\n{}", resp.status, resp.status_text, length, resp.body);
+    let response = format!(
+        "HTTP/1.1 {} {}\r\nContent-Length: {}\r\n\r\n{}",
+        resp.status, resp.status_text, length, resp.body
+    );
 
     stream.write_all(response.as_bytes()).unwrap();
 }
@@ -83,10 +79,14 @@ pub type URI = Vec<String>;
 pub type Headers = HashMap<String, String>;
 
 // TODO propagate errors into result instead of option
-fn parse_request(
-    req_lines: &Vec<String>,
-    buffer: &mut BufReader<&mut TcpStream>,
-) -> Option<Request> {
+fn parse_request(buffer: &mut BufReader<&mut TcpStream>) -> Option<Request> {
+    let req_lines = buffer
+        .by_ref()
+        .lines()
+        .map(|e| e.expect("Expected UTF-8 string"));
+    let req_lines: Vec<String> = req_lines.take_while(|line| !line.is_empty()).collect();
+    println!("New request: {:#?}", &req_lines);
+
     let first_line: Vec<_> = req_lines.get(0)?.split(' ').collect();
     let method: Method = match *first_line.get(0)? {
         "GET" => Some(Method::GET),
@@ -96,7 +96,12 @@ fn parse_request(
         "PUT" => Some(Method::PUT),
         _ => None,
     }?;
-    let uri: URI = first_line.get(1)?.split('/').map(String::from).collect();
+    let uri: URI = first_line
+        .get(1)?
+        .split('/')
+        .map(String::from)
+        .filter(|part| !part.is_empty())
+        .collect();
 
     let headers: HashMap<String, String> = req_lines
         .iter()
