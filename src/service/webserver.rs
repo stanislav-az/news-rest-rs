@@ -3,10 +3,13 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
-    net::{TcpListener, TcpStream},
+    net::{TcpListener, TcpStream}, sync::Arc,
 };
 
-pub fn run_server() {
+type Application = Arc<dyn Fn(Request) -> Response + Send + Sync>;
+
+pub fn run_server(application: Application)
+    {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(4);
 
@@ -14,13 +17,15 @@ pub fn run_server() {
         let stream = stream.unwrap();
         println!("Received connection!");
 
+        let app = Arc::clone(&application);
         pool.execute(|| {
-            handle_connection(stream);
+            handle_connection(stream, app);
         });
     }
 }
 
-fn handle_connection(mut stream: TcpStream) {
+fn handle_connection(mut stream: TcpStream, application: Application)
+    {
     let mut buf_reader = BufReader::new(&mut stream);
     let lines = buf_reader
         .by_ref()
@@ -32,7 +37,11 @@ fn handle_connection(mut stream: TcpStream) {
     let parsed_req = parse_request(&request, &mut buf_reader);
     println!("Parsed request: {:#?}", parsed_req);
 
-    let response = "HTTP/1.1 200 OK\r\n\r\n";
+    let resp = application(parsed_req.unwrap());
+    let length = resp.body.len();
+    let response =
+        format!("HTTP/1.1 {} {}\r\nContent-Length: {}\r\n\r\n{}", resp.status, resp.status_text, length, resp.body);
+
     stream.write_all(response.as_bytes()).unwrap();
 }
 // TODO do not drop connection after single request if Connection: keep-alive
@@ -46,12 +55,28 @@ pub struct Request {
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Response {
+    pub status: u64,
+    pub status_text: String,
+    pub headers: Headers,
+    pub body: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Method {
     GET,
     POST,
     PATCH,
     DELETE,
     PUT,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ContentType {
+    PlainText, // text/plain
+    HTML,      // text/html
+    JSON,      // application/json
+    XML,       // application/xml
 }
 
 pub type URI = Vec<String>;
