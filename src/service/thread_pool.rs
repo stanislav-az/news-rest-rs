@@ -56,8 +56,7 @@ impl Drop for ThreadPool {
         drop(self.sender.take());
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
-
+            // println!("Shutting down worker {}", worker.id);
             if let Some(thread) = worker.thread.take() {
                 thread.join().expect("Associated worker thread panicked");
             }
@@ -66,7 +65,7 @@ impl Drop for ThreadPool {
 }
 
 struct Worker {
-    id: usize,
+    _id: usize,
     thread: Option<thread::JoinHandle<()>>,
 }
 
@@ -80,19 +79,18 @@ impl Worker {
 
             match message {
                 Ok(job) => {
-                    println!("Worker {id} got a job; executing.");
-
+                    // println!("Worker {id} got a job; executing.");
                     job();
                 }
                 Err(_) => {
-                    println!("Worker {id} disconnected; shutting down.");
+                    // println!("Worker {id} disconnected; shutting down.");
                     break;
                 }
             }
         });
 
         Worker {
-            id,
+            _id: id,
             thread: Some(thread),
         }
     }
