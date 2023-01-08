@@ -36,8 +36,7 @@ pub struct LoggerSettings {
 
 impl Drop for Logger {
     fn drop(&mut self) {
-        // TODO rm log
-        println!("Shutting down logger...");
+        // println!("Shutting down logger...");
         drop(self.log_chan.take());
     }
 }
@@ -74,8 +73,7 @@ impl Logger {
                     }
                 }
                 Err(_) => {
-                    // TODO rm log
-                    println!("Logger disconnected, stopping logger thread...");
+                    // println!("Logger disconnected, stopping logger thread...");
                     break;
                 }
             }
