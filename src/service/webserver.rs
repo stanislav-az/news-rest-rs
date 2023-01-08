@@ -31,16 +31,37 @@ fn handle_connection(mut stream: TcpStream, application: Application) {
     let parsed_req = parse_request(&mut buf_reader);
     println!("Parsed request: {:#?}", parsed_req);
 
-    let resp = application(parsed_req.unwrap());
-    let length = resp.body.len();
-    let response = format!(
-        "HTTP/1.1 {} {}\r\nContent-Length: {}\r\n\r\n{}",
-        resp.status, resp.status_text, length, resp.body
-    );
+    let response = application(parsed_req.unwrap());
+    let response = response_to_string(response);
+    println!("Sending response: {}", &response);
 
     stream.write_all(response.as_bytes()).unwrap();
 }
 // TODO do not drop connection after single request if Connection: keep-alive
+
+fn response_to_string(response: Response) -> String {
+    let body = response
+        .body
+        .as_ref()
+        .map_or(String::new(), |b| b.content.to_string());
+
+    let length = body.len();
+    let mut headers = response.headers;
+    if let Some(content_type) = response.body.map(|b| b.content_type) {
+        headers.insert(String::from("Content-Type"), content_type.get_mime_type());
+        headers.insert(String::from("Content-Length"), length.to_string());
+    }
+    let headers = headers
+        .iter()
+        .map(|(k, v)| format!("{k}: {v}"))
+        .reduce(|acc, e| format!("{acc}\r\n{e}"))
+        .unwrap_or(String::new());
+
+    format!(
+        "HTTP/1.1 {} {}\r\n{}\r\n\r\n{}",
+        response.status, response.status_text, headers, body
+    )
+}
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Request {
@@ -55,7 +76,13 @@ pub struct Response {
     pub status: u64,
     pub status_text: String,
     pub headers: Headers,
-    pub body: String,
+    pub body: Option<ResponseBody>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResponseBody {
+    pub content: String,
+    pub content_type: ContentType,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +100,18 @@ pub enum ContentType {
     HTML,      // text/html
     JSON,      // application/json
     XML,       // application/xml
+}
+
+impl ContentType {
+    pub fn get_mime_type(&self) -> String {
+        let mime_type = match self {
+            Self::PlainText => "text/plain",
+            Self::HTML => "text/html",
+            Self::JSON => "application/json",
+            Self::XML => "application/xml",
+        };
+        String::from(mime_type)
+    }
 }
 
 pub type URI = Vec<String>;

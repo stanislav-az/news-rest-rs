@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs, sync::Arc, thread, time::Duration};
 
 use news_rest_rs::service::{
     logger::{LogLevel, Logger, LoggerSettings},
-    webserver::{run_server, Method, Request, Response},
+    webserver::{run_server, ContentType, Method, Request, Response, ResponseBody},
 };
 
 fn main() {
@@ -14,7 +14,10 @@ fn main() {
                 status: 200,
                 status_text: String::from("OK"),
                 headers: HashMap::new(),
-                body,
+                body: Some(ResponseBody {
+                    content: body,
+                    content_type: ContentType::HTML,
+                }),
             };
         }
         if req.uri == vec!["sleep"] && req.method == Method::GET {
@@ -24,7 +27,10 @@ fn main() {
                 status: 200,
                 status_text: String::from("OK"),
                 headers: HashMap::new(),
-                body: String::from("Hello from awake rust server!"),
+                body: Some(ResponseBody {
+                    content: String::from("Hello from awake rust server!"),
+                    content_type: ContentType::PlainText,
+                }),
             };
         }
 
@@ -33,7 +39,10 @@ fn main() {
             status: 404,
             status_text: String::from("NOT FOUND"),
             headers: HashMap::new(),
-            body,
+            body: Some(ResponseBody {
+                content: body,
+                content_type: ContentType::HTML,
+            }),
         }
     };
 
