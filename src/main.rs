@@ -14,7 +14,7 @@ async fn main() {
         .incoming()
         .for_each_concurrent(None, |tcp_stream| async {
             let tcp_stream = tcp_stream.unwrap();
-            handle_connection(tcp_stream).await;
+            task::spawn(handle_connection(tcp_stream));
         })
         .await;
 }
