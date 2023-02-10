@@ -344,6 +344,7 @@ dependencies = [
 name = "news-rest-rs"
 version = "0.1.0"
 dependencies = [
+ "bytes",
  "mini-redis",
  "tokio",
 ]
