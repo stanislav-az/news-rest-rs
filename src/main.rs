@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, sync::Arc, thread, time::Duration};
+use std::{collections::HashMap, fs, thread, time::Duration};
 
 use news_rest_rs::service::{
     logger::{LogLevel, Logger, LoggerSettings},
@@ -6,7 +6,18 @@ use news_rest_rs::service::{
 };
 
 fn main() {
-    let application = |req: Request| {
+    let logger_settings = LoggerSettings {
+        log_to_file: Some(String::from("logs/journal.log")),
+        log_to_stderr: true,
+        log_level_starting_from: LogLevel::Debug,
+    };
+    let mut logger = Logger::initialize(&logger_settings);
+    logger.log_debug("Logger started");
+
+    let mut logger = logger.clone();
+    let application = move |req: Request| {
+        logger.log_info(&format!("App received request: {:?}", req));
+
         if req.uri.is_empty() && req.method == Method::GET {
             let body = fs::read_to_string("static/main_page.html").unwrap();
 
@@ -46,6 +57,5 @@ fn main() {
         }
     };
 
-    let application = Arc::new(application);
     run_server(application)
 }

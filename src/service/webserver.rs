@@ -4,13 +4,14 @@ use std::{
     collections::HashMap,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
-    sync::Arc,
 };
 
-type Application = Arc<dyn Fn(Request) -> Response + Send + Sync>;
-
 // TODO add server config with thread pool size and host, port
-pub fn run_server(application: Application) {
+pub fn run_server<App>(application: App)
+where
+    App: FnMut(Request) -> Response,
+    App: Send + 'static + Clone,
+{
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(4);
 
@@ -18,15 +19,18 @@ pub fn run_server(application: Application) {
         let stream = stream.unwrap();
         println!("Received connection!");
 
-        let app = Arc::clone(&application);
-        pool.execute(|| {
+        let app = application.clone();
+        pool.execute(move || {
             handle_connection(stream, app);
         });
     }
 }
 
 // TODO rm debug logs and unwrap calls
-fn handle_connection(mut stream: TcpStream, application: Application) {
+fn handle_connection<App>(mut stream: TcpStream, mut application: App)
+where
+    App: FnMut(Request) -> Response,
+{
     let mut buf_reader = BufReader::new(&mut stream);
     let parsed_req = parse_request(&mut buf_reader);
     println!("Parsed request: {:#?}", parsed_req);
