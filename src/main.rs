@@ -34,6 +34,8 @@ fn main() {
     let rt = tokio::runtime::Runtime::new().unwrap(); // Builds multi-threaded runtime
     // Elapsed time 2s
 
+    // single threaded runtime from futures also works in 2s when spawning with async_std
+    // https://github.com/PacktPublishing/Rust-Web-Programming/blob/master/Chapter03/async_functions/src/main.rs
     let now = time::Instant::now();
     let result = rt.block_on(third_outcome);
     println!("time elapsed for join vec {:?}", now.elapsed());
