@@ -1,8 +1,15 @@
 [package]
-name = "news-rest-rs"
+name = "managing_views"
 version = "0.1.0"
-edition = "2021"
+authors = ["Maxwell Flitton <maxwellflitton@gmail.com>"]
+edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actix-web = "4.3.0"
+actix-rt = "2.8.0"
+serde = {version = "1.0.152", features = ["derive"]}
+serde_json = "1.0.93"
+actix-service = "2.0.2"
+futures = "0.3.26"
