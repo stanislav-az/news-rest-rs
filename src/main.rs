@@ -7,7 +7,6 @@ mod json_serialization;
 mod views;
 mod processes;
 
-
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {

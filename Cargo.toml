@@ -1,5 +1,5 @@
 [package]
-name = "managing_views"
+name = "todo"
 version = "0.1.0"
 authors = ["Maxwell Flitton <maxwellflitton@gmail.com>"]
 edition = "2018"
