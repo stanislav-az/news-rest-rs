@@ -1,11 +1,11 @@
-use std::net::TcpListener;
+#[tokio::main]
+async fn main() {
+    // Build our application with a single route.
+    let app = axum::Router::new().route("/", axum::routing::get(|| async { "Hello, World!" }));
 
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
-
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
-
-        println!("Connection established!");
-    }
+    // Run our application as a hyper server on http://localhost:3000.
+    axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
