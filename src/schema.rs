@@ -1,9 +1,10 @@
-use diesel::prelude::*;
+// @generated automatically by Diesel CLI.
 
-table! {
-  stories (id) {
-    id -> Int4,
-    title -> Text,
-    content -> Text,
-  }
+diesel::table! {
+    stories (id) {
+        id -> Int4,
+        title -> Varchar,
+        content -> Text,
+        is_published -> Bool,
+    }
 }
