@@ -30,7 +30,7 @@ pub async fn fallback_handler(uri: http::Uri) -> impl axum::response::IntoRespon
     (http::StatusCode::NOT_FOUND, format!("No route {}", uri))
 }
 
-// TODO spawn a tokio task for db query
+// TODO spawn a tokio task for db query or use diesel-async ?
 pub async fn get_stories() -> Json<Vec<Story>> {
     let mut conn = establish_connection();
 
