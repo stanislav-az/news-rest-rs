@@ -15,4 +15,5 @@ pub struct Story {
     pub id: i32,
     pub title: String,
     pub content: String,
+    pub is_published: bool,
 }

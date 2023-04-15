@@ -7,6 +7,7 @@ use news_rest_rs::db::establish_connection;
 use news_rest_rs::news::stories::NewStory;
 use news_rest_rs::news::stories::Story;
 use news_rest_rs::schema::stories;
+use news_rest_rs::schema::stories::dsl::*;
 
 #[tokio::main]
 async fn main() {
@@ -30,11 +31,12 @@ pub async fn fallback_handler(uri: http::Uri) -> impl axum::response::IntoRespon
     (http::StatusCode::NOT_FOUND, format!("No route {}", uri))
 }
 
-// TODO spawn a tokio task for db query
+// TODO spawn a tokio task for db query or use diesel-async ?
 pub async fn get_stories() -> Json<Vec<Story>> {
     let mut conn = establish_connection();
 
     let news = stories::table
+        // .filter(is_published.eq(true))
         .order(stories::columns::id.asc())
         .load::<Story>(&mut conn)
         .unwrap();
