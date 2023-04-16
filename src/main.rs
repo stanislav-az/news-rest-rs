@@ -7,6 +7,8 @@ async fn main() {
     // Build our application with a single route.
     let app = axum::Router::new()
         .fallback(fallback_handler)
+        .route("/api/stories/publish/:id", routing::patch(handlers::publish_story))
+        .route("/api/stories/:id", routing::delete(handlers::delete_story))
         .route("/api/stories", routing::post(handlers::create_story))
         .route("/api/stories", routing::get(handlers::get_stories))
         .route("/", routing::get(|| async { "Hello, World!" }));
