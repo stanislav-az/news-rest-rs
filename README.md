@@ -11,6 +11,7 @@ cp template.env .env
 ```
 
 And modify all env variables there.
+P.S. You can generate SALT_16_BYTES_BASE_64 var using `openssl rand -base64 16`.
 
 ## Diesel database management
 

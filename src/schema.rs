@@ -14,7 +14,7 @@ diesel::table! {
         id -> Int4,
         name -> Varchar,
         login -> Varchar,
-        password -> Varchar,
+        password -> Bytea,
         creation_timestamp -> Timestamptz,
         is_admin -> Bool,
         is_author -> Bool,
