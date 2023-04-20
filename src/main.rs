@@ -6,6 +6,7 @@ use news_rest_rs::news::handlers;
 async fn main() {
     let app = axum::Router::new()
         .fallback(fallback_handler)
+        .route("/api/users/:id", routing::patch(handlers::update_user))
         .route("/api/users/:id", routing::delete(handlers::delete_user))
         .route("/api/users", routing::post(handlers::create_user))
         .route("/api/users", routing::get(handlers::get_users))

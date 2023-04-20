@@ -17,3 +17,10 @@ where
 {
     (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
 }
+
+fn bad_request<E>(err: E) -> Error
+where
+    E: std::error::Error,
+{
+    (StatusCode::BAD_REQUEST, err.to_string())
+}
