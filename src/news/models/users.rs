@@ -8,6 +8,48 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UserSerializer {
+    pub id: Option<i32>,
+    pub name: Option<String>,
+    pub login: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    pub creation_timestamp: Option<DateTime<Utc>>,
+    pub is_admin: Option<bool>,
+    pub is_author: Option<bool>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserSerializerError {
+    BadRequest(String),
+}
+
+impl UserSerializer {
+    pub fn from_user(user: User) -> Self {
+        UserSerializer {
+            id: Some(user.id),
+            name: Some(user.name),
+            login: Some(user.login),
+            password: None,
+            creation_timestamp: Some(user.creation_timestamp),
+            is_admin: Some(user.is_admin),
+            is_author: Some(user.is_author),
+        }
+    }
+
+    pub fn validate_deserialized_user(&self) -> Result<(), UserSerializerError> {
+        if self.id.is_some() || self.login.is_some() || self.creation_timestamp.is_some() {
+            let msg = String::from(
+                "You can't modify certain user fields like id, login and creation_timestamp",
+            );
+            Err(UserSerializerError::BadRequest(msg))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NewUserSerializer {
     pub name: String,
     pub login: String,
