@@ -1,10 +1,11 @@
-use crate::services::pbkdf2;
-use crate::{news::auth, schema::*};
 use chrono::{DateTime, Utc};
 use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdErr;
 use std::fmt;
+
+use crate::services::pbkdf2;
+use crate::{news::auth, schema::*};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserSerializer {
@@ -46,9 +47,14 @@ impl UserSerializer {
         self,
         login: &str,
     ) -> Result<UpdatableUser, UserSerializerError> {
-        if self.id.is_some() || self.login.is_some() || self.creation_timestamp.is_some() {
+        if self.id.is_some()
+            || self.login.is_some()
+            || self.creation_timestamp.is_some()
+            || self.is_admin.is_some()
+            || self.is_author.is_some()
+        {
             let msg = String::from(
-                "You can't modify certain user fields like id, login and creation_timestamp",
+                "You can't modify certain user fields like id, login, is_admin, is_author, and creation_timestamp",
             );
             Err(UserSerializerError(msg))
         } else {
@@ -61,8 +67,6 @@ impl UserSerializer {
             Ok(UpdatableUser {
                 name: self.name,
                 password,
-                is_admin: self.is_admin,
-                is_author: self.is_author,
             })
         }
     }
@@ -97,8 +101,6 @@ impl NewUserSerializer {
 pub struct UpdatableUser {
     pub name: Option<String>,
     pub password: Option<Vec<u8>>,
-    pub is_admin: Option<bool>,
-    pub is_author: Option<bool>,
 }
 
 #[derive(Debug, PartialEq, Eq, Insertable, Serialize, Deserialize)]

@@ -87,7 +87,7 @@ impl fmt::Display for NotAuthorized {
 
 impl StdErr for NotAuthorized {}
 
-pub fn authorize_admin(user: User) -> Result<(), NotAuthorized> {
+pub fn authorize_admin(user: &User) -> Result<(), NotAuthorized> {
     if user.is_admin {
         Ok(())
     } else {
@@ -95,8 +95,16 @@ pub fn authorize_admin(user: User) -> Result<(), NotAuthorized> {
     }
 }
 
-pub fn authorize_self(id: i32, user: User) -> Result<(), NotAuthorized> {
+pub fn authorize_self(id: i32, user: &User) -> Result<(), NotAuthorized> {
     if user.id == id {
+        Ok(())
+    } else {
+        Err(NotAuthorized)
+    }
+}
+
+pub fn authorize_self_or_admin(id: i32, user: &User) -> Result<(), NotAuthorized> {
+    if user.id == id || user.is_admin {
         Ok(())
     } else {
         Err(NotAuthorized)
