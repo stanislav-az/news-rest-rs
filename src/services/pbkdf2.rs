@@ -2,8 +2,8 @@ use ring::{digest, pbkdf2};
 use std::num::NonZeroU32;
 
 static PBKDF2_ALG: pbkdf2::Algorithm = pbkdf2::PBKDF2_HMAC_SHA256;
-const CREDENTIAL_LEN: usize = digest::SHA256_OUTPUT_LEN;
-const PBKDF2_ITERATIONS: u32 = 100_000;
+pub const CREDENTIAL_LEN: usize = digest::SHA256_OUTPUT_LEN;
+pub const PBKDF2_ITERATIONS: u32 = 100_000;
 pub type Credential = [u8; CREDENTIAL_LEN];
 pub type Salt = [u8; 16];
 

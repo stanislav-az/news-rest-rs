@@ -1,20 +1,25 @@
+use axum::extract::Path;
+use axum::http;
+use axum::Json;
+use axum_auth::AuthBasic;
+use diesel::delete;
+use diesel::insert_into;
+use diesel::prelude::*;
+use diesel::update;
+
 use super::bad_request;
+use super::forbidden;
 use super::internal_error;
 use super::Error;
 use super::Response;
 use crate::db::establish_connection;
+use crate::news::auth::authenticate;
+use crate::news::auth::authorize_admin;
 use crate::news::models::NewUser;
 use crate::news::models::NewUserSerializer;
 use crate::news::models::User;
 use crate::news::models::UserSerializer;
 use crate::schema::users;
-use axum::extract::Path;
-use axum::http;
-use axum::Json;
-use diesel::delete;
-use diesel::insert_into;
-use diesel::prelude::*;
-use diesel::update;
 
 pub async fn get_users() -> Result<Json<Vec<UserSerializer>>, Error> {
     let mut conn = establish_connection();
@@ -29,7 +34,10 @@ pub async fn get_users() -> Result<Json<Vec<UserSerializer>>, Error> {
     Ok(news.into())
 }
 
-pub async fn create_user(user: Json<NewUserSerializer>) -> Response {
+pub async fn create_user(claims: AuthBasic, user: Json<NewUserSerializer>) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    authorize_admin(actor).map_err(forbidden)?;
+
     let user: NewUserSerializer = user.0;
     let user: NewUser = user.into_new_user();
     let mut conn = establish_connection();

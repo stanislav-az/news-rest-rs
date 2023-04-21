@@ -62,6 +62,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "axum-auth"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "620b37645b77baab8160f93421568d7b3dd25da0a160fab38eb1c4ef611f6d98"
+dependencies = [
+ "async-trait",
+ "axum-core",
+ "base64 0.13.1",
+ "http",
+]
+
+[[package]]
 name = "axum-core"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -77,6 +89,12 @@ dependencies = [
  "tower-layer",
  "tower-service",
 ]
+
+[[package]]
+name = "base64"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
@@ -500,7 +518,8 @@ name = "news-rest-rs"
 version = "0.1.0"
 dependencies = [
  "axum",
- "base64",
+ "axum-auth",
+ "base64 0.21.0",
  "chrono",
  "diesel",
  "diesel_migrations",

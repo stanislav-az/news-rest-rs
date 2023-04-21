@@ -24,3 +24,10 @@ where
 {
     (StatusCode::BAD_REQUEST, err.to_string())
 }
+
+fn forbidden<E>(err: E) -> Error
+where
+    E: std::error::Error,
+{
+    (StatusCode::FORBIDDEN, err.to_string())
+}

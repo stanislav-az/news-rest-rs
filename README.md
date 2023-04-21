@@ -44,3 +44,18 @@ diesel migration generate description_of_the_change
 ```sh
 diesel migration run
 ```
+
+## Auth
+
+[Basic](https://en.wikipedia.org/wiki/Basic_access_authentication) access authentication is implemented for this project.
+In short: there is a header included inside each guarded request. This header is looking like this `Authorization: Basic *`,
+where `*` is login and password concatenated with `:` in the middle (`login:password`) and base 64 encoded.
+
+### Admin
+
+Administrator user is created inside migrations (insert_superuser). His login is "admin" and his password is "hello_rust".
+You can encode it for using inside header using postman, or in linux terminal:
+
+```sh
+echo -n "admin:hello_rust" | base64
+```
