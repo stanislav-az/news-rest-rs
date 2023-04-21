@@ -1,7 +1,9 @@
 pub mod stories;
+pub mod users;
 
 use axum::http::StatusCode;
 pub use stories::*;
+pub use users::*;
 
 pub type Error = (StatusCode, String);
 
@@ -14,4 +16,18 @@ where
     E: std::error::Error,
 {
     (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+}
+
+fn bad_request<E>(err: E) -> Error
+where
+    E: std::error::Error,
+{
+    (StatusCode::BAD_REQUEST, err.to_string())
+}
+
+fn forbidden<E>(err: E) -> Error
+where
+    E: std::error::Error,
+{
+    (StatusCode::FORBIDDEN, err.to_string())
 }
