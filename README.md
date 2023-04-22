@@ -1,6 +1,6 @@
 # news-rest-rs
 
-A simple blog server in rust using axum and diesel.
+A simple blog server in rust using axum and diesel. Run server with `cargo run`. It will start at `http://localhost:3000`.
 
 ## Environment configuration
 
