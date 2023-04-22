@@ -95,16 +95,24 @@ pub fn authorize_admin(user: &User) -> Result<(), NotAuthorized> {
     }
 }
 
-pub fn authorize_self(id: i32, user: &User) -> Result<(), NotAuthorized> {
-    if user.id == id {
+pub fn authorize_author(user: &User) -> Result<(), NotAuthorized> {
+    if user.is_author {
         Ok(())
     } else {
         Err(NotAuthorized)
     }
 }
 
-pub fn authorize_self_or_admin(id: i32, user: &User) -> Result<(), NotAuthorized> {
-    if user.id == id || user.is_admin {
+pub fn authorize_self(user_id: i32, user: &User) -> Result<(), NotAuthorized> {
+    if user.id == user_id {
+        Ok(())
+    } else {
+        Err(NotAuthorized)
+    }
+}
+
+pub fn authorize_self_or_admin(user_id: i32, user: &User) -> Result<(), NotAuthorized> {
+    if user.id == user_id || user.is_admin {
         Ok(())
     } else {
         Err(NotAuthorized)

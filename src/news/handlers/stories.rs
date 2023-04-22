@@ -1,18 +1,27 @@
-use super::internal_error;
-use super::Error;
-use super::Response;
-use crate::db::establish_connection;
-use crate::news::models::NewStory;
-use crate::news::models::Story;
-use crate::schema::stories;
-use crate::schema::stories::dsl::*;
 use axum::extract::Path;
 use axum::http;
 use axum::Json;
+use axum_auth::AuthBasic;
 use diesel::delete;
 use diesel::insert_into;
 use diesel::prelude::*;
 use diesel::update;
+
+use super::forbidden;
+use super::internal_error;
+use super::Error;
+use super::Response;
+use crate::db::establish_connection;
+use crate::news::auth::authenticate;
+use crate::news::auth::authorize_author;
+use crate::news::auth::authorize_self;
+use crate::news::auth::authorize_self_or_admin;
+use crate::news::models::NewStory;
+use crate::news::models::NewStorySerializer;
+use crate::news::models::Story;
+use crate::news::models::UpdatableStory;
+use crate::schema::stories;
+use crate::schema::stories::dsl::*;
 
 pub async fn get_stories() -> Result<Json<Vec<Story>>, Error> {
     let mut conn = establish_connection();
@@ -26,8 +35,36 @@ pub async fn get_stories() -> Result<Json<Vec<Story>>, Error> {
     Ok(news.into())
 }
 
-pub async fn create_story(story: Json<NewStory>) -> Response {
-    let story: NewStory = story.0;
+pub async fn get_story(
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+) -> Result<Json<Story>, Error> {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+
+    let mut conn = establish_connection();
+
+    let story: Option<Story> = stories::table
+        .find(id_selector)
+        .get_result(&mut conn)
+        .optional()
+        .map_err(internal_error)?;
+
+    match story {
+        None => return Err((http::StatusCode::NOT_FOUND, String::new())),
+        Some(story) => {
+            authorize_self(story.user_id, &actor).map_err(forbidden)?;
+
+            Ok(story.into())
+        }
+    }
+}
+
+pub async fn create_story(claims: AuthBasic, story: Json<NewStorySerializer>) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    authorize_author(&actor).map_err(forbidden)?;
+
+    let story: NewStorySerializer = story.0;
+    let story: NewStory = story.into_new_story(actor.id);
     let mut conn = establish_connection();
 
     let _res = insert_into(stories::table)
@@ -38,30 +75,82 @@ pub async fn create_story(story: Json<NewStory>) -> Response {
     Ok(http::StatusCode::CREATED)
 }
 
-pub async fn publish_story(Path(id_selector): Path<i32>) -> Response {
+pub async fn publish_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+
     let mut conn = establish_connection();
 
-    let num_rows = update(stories::table.find(id_selector))
-        .set(is_published.eq(true))
-        .execute(&mut conn)
+    let story: Option<Story> = stories::table
+        .find(id_selector)
+        .get_result(&mut conn)
+        .optional()
         .map_err(internal_error)?;
 
-    if let 0 = num_rows {
-        return Ok(http::StatusCode::NOT_FOUND);
-    }
+    match story {
+        None => return Ok(http::StatusCode::NOT_FOUND),
+        Some(story) => {
+            authorize_self(story.user_id, &actor).map_err(forbidden)?;
+
+            update(&story)
+                .set(is_published.eq(true))
+                .execute(&mut conn)
+                .map_err(internal_error)?;
+        }
+    };
 
     Ok(http::StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_story(Path(id_selector): Path<i32>) -> Response {
+pub async fn update_story(
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+    updated_story: Json<UpdatableStory>,
+) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+
+    let updated_story: UpdatableStory = updated_story.0;
+
     let mut conn = establish_connection();
 
-    let num_rows = delete(stories::table.find(id_selector))
-        .execute(&mut conn)
+    let story: Option<Story> = stories::table
+        .find(id_selector)
+        .get_result(&mut conn)
+        .optional()
         .map_err(internal_error)?;
 
-    if let 0 = num_rows {
-        return Ok(http::StatusCode::NOT_FOUND);
+    match story {
+        None => return Ok(http::StatusCode::NOT_FOUND),
+        Some(story) => {
+            authorize_self(story.user_id, &actor).map_err(forbidden)?;
+
+            update(&story)
+                .set(updated_story)
+                .execute(&mut conn)
+                .map_err(internal_error)?;
+        }
+    };
+
+    Ok(http::StatusCode::NO_CONTENT)
+}
+
+pub async fn delete_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+
+    let mut conn = establish_connection();
+
+    let story: Option<Story> = stories::table
+        .find(id_selector)
+        .get_result(&mut conn)
+        .optional()
+        .map_err(internal_error)?;
+
+    match story {
+        None => return Ok(http::StatusCode::NOT_FOUND),
+        Some(story) => {
+            authorize_self_or_admin(story.user_id, &actor).map_err(forbidden)?;
+
+            delete(&story).execute(&mut conn).map_err(internal_error)?;
+        }
     }
 
     Ok(http::StatusCode::NO_CONTENT)
