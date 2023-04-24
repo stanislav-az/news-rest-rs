@@ -2,6 +2,7 @@ use axum::extract::Path;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
+use diesel::delete;
 use diesel::insert_into;
 use diesel::prelude::*;
 use diesel::update;
@@ -66,6 +67,23 @@ pub async fn update_category(
 
     let num_rows = update(categories::table.find(id_selector))
         .set(&updated_category)
+        .execute(&mut conn)
+        .map_err(internal_error)?;
+
+    if let 0 = num_rows {
+        return Ok(http::StatusCode::NOT_FOUND);
+    }
+
+    Ok(http::StatusCode::NO_CONTENT)
+}
+
+pub async fn delete_category(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
+    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    authorize_admin(&actor).map_err(forbidden)?;
+
+    let mut conn = establish_connection();
+
+    let num_rows = delete(categories::table.find(id_selector))
         .execute(&mut conn)
         .map_err(internal_error)?;
 
