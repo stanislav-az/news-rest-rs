@@ -1,7 +1,9 @@
+pub mod categories;
 pub mod stories;
 pub mod users;
 
 use axum::http::StatusCode;
+pub use categories::*;
 pub use stories::*;
 pub use users::*;
 
