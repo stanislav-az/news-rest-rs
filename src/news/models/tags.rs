@@ -1,4 +1,4 @@
-use diesel::{Identifiable, Insertable, Queryable};
+use diesel::{Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
 use crate::schema::*;
@@ -9,7 +9,7 @@ pub struct NewTag {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Queryable, Identifiable, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Queryable, Selectable, Identifiable, Deserialize, Serialize)]
 pub struct Tag {
     pub id: i32,
     pub name: String,

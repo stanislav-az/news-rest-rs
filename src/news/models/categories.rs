@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
+use diesel::{AsChangeset, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
 use crate::schema::*;
@@ -40,7 +40,7 @@ pub struct NewCategory {
     pub parent_id: Option<i32>,
 }
 
-#[derive(Debug, PartialEq, Eq, Queryable, Identifiable)]
+#[derive(Debug, PartialEq, Eq, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = categories)]
 pub struct Category {
     pub id: i32,

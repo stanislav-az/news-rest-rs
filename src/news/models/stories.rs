@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
-use diesel::{Identifiable, Insertable, Queryable, AsChangeset};
+use diesel::{AsChangeset, Associations, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
+use super::{Category, User};
 use crate::schema::*;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,7 +40,13 @@ pub struct NewStory {
     pub category_id: Option<i32>,
 }
 
-#[derive(Debug, PartialEq, Eq, Queryable, Identifiable, Serialize, Deserialize)]
+#[derive(
+    Debug, PartialEq, Eq,
+    Queryable, Selectable, Identifiable, Associations,
+    Serialize, Deserialize,
+)]
+#[diesel(belongs_to(User))]
+#[diesel(belongs_to(Category))]
 #[diesel(table_name = stories)]
 pub struct Story {
     pub id: i32,
