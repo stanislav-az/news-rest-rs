@@ -21,6 +21,7 @@ use crate::news::models::NewStorySerializer;
 use crate::news::models::Story;
 use crate::news::models::TagStory;
 use crate::news::models::UpdatableStory;
+use crate::news::models::UpdatableStorySerializer;
 use crate::schema::stories;
 use crate::schema::stories::dsl::*;
 use crate::schema::tags_stories;
@@ -120,11 +121,13 @@ pub async fn publish_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> R
 pub async fn update_story(
     claims: AuthBasic,
     Path(id_selector): Path<i32>,
-    updated_story: Json<UpdatableStory>,
+    updated_story_ser: Json<UpdatableStorySerializer>,
 ) -> Response {
     let actor = authenticate(claims).map_err(|e| e.into_error())?;
 
-    let updated_story: UpdatableStory = updated_story.0;
+    let updated_story_ser: UpdatableStorySerializer = updated_story_ser.0;
+    let tags = updated_story_ser.tags.clone();
+    let updated_story: UpdatableStory = updated_story_ser.into_updatable_story();
 
     let mut conn = establish_connection();
 
@@ -143,6 +146,25 @@ pub async fn update_story(
                 .set(updated_story)
                 .execute(&mut conn)
                 .map_err(internal_error)?;
+
+            if !tags.is_empty() {
+                diesel::delete(tags_stories::table.filter(tags_stories::story_id.eq(story.id)))
+                    .execute(&mut conn)
+                    .map_err(internal_error)?;
+
+                let tag_relations: Vec<TagStory> = tags
+                    .into_iter()
+                    .map(|tag_id| TagStory {
+                        tag_id,
+                        story_id: story.id,
+                    })
+                    .collect();
+
+                insert_into(tags_stories::table)
+                    .values(&tag_relations)
+                    .execute(&mut conn)
+                    .map_err(internal_error)?;
+            }
         }
     };
 

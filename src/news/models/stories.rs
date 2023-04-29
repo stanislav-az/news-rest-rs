@@ -10,6 +10,7 @@ pub struct NewStorySerializer {
     pub title: String,
     pub content: String,
     pub category_id: Option<i32>,
+    #[serde(default = "Vec::new")]
     pub tags: Vec<i32>,
 }
 
@@ -24,7 +25,26 @@ impl NewStorySerializer {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, AsChangeset, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdatableStorySerializer {
+    pub title: Option<String>,
+    pub content: Option<String>,
+    pub category_id: Option<i32>,
+    #[serde(default = "Vec::new")]
+    pub tags: Vec<i32>,
+}
+
+impl UpdatableStorySerializer {
+    pub fn into_updatable_story(self) -> UpdatableStory {
+        UpdatableStory {
+            title: self.title,
+            content: self.content,
+            category_id: self.category_id,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, AsChangeset)]
 #[diesel(table_name = stories)]
 pub struct UpdatableStory {
     pub title: Option<String>,
