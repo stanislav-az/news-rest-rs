@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use diesel::{AsChangeset, Identifiable, Insertable, Queryable};
+use diesel::{AsChangeset, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 use std::error::Error as StdErr;
 use std::fmt;
@@ -96,14 +96,14 @@ impl NewUserSerializer {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, AsChangeset, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, AsChangeset)]
 #[diesel(table_name = users)]
 pub struct UpdatableUser {
     pub name: Option<String>,
     pub password: Option<Vec<u8>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Insertable, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Insertable)]
 #[diesel(table_name = users)]
 pub struct NewUser {
     pub name: String,
@@ -113,7 +113,7 @@ pub struct NewUser {
     pub is_author: Option<bool>,
 }
 
-#[derive(Debug, PartialEq, Eq, Queryable, Identifiable, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Queryable, Selectable, Identifiable)]
 #[diesel(table_name = users)]
 pub struct User {
     pub id: i32,

@@ -1,8 +1,12 @@
+pub mod categories;
 pub mod stories;
+pub mod tags;
 pub mod users;
 
 use axum::http::StatusCode;
+pub use categories::*;
 pub use stories::*;
+pub use tags::*;
 pub use users::*;
 
 pub type Error = (StatusCode, String);
