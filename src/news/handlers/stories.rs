@@ -19,9 +19,11 @@ use crate::news::auth::authorize_self_or_admin;
 use crate::news::models::NewStory;
 use crate::news::models::NewStorySerializer;
 use crate::news::models::Story;
+use crate::news::models::TagStory;
 use crate::news::models::UpdatableStory;
 use crate::schema::stories;
 use crate::schema::stories::dsl::*;
+use crate::schema::tags_stories;
 
 pub async fn get_stories() -> Result<Json<Vec<Story>>, Error> {
     let mut conn = establish_connection();
@@ -59,16 +61,30 @@ pub async fn get_story(
     }
 }
 
-pub async fn create_story(claims: AuthBasic, story: Json<NewStorySerializer>) -> Response {
+pub async fn create_story(claims: AuthBasic, story_ser: Json<NewStorySerializer>) -> Response {
     let actor = authenticate(claims).map_err(|e| e.into_error())?;
     authorize_author(&actor).map_err(forbidden)?;
 
-    let story: NewStorySerializer = story.0;
-    let story: NewStory = story.into_new_story(actor.id);
+    let story_ser: NewStorySerializer = story_ser.0;
+    let tags: Vec<i32> = story_ser.tags.clone();
+    let story: NewStory = story_ser.into_new_story(actor.id);
     let mut conn = establish_connection();
 
-    let _res = insert_into(stories::table)
+    let entry: Story = insert_into(stories::table)
         .values(&story)
+        .get_result(&mut conn)
+        .map_err(internal_error)?;
+
+    let tag_relations: Vec<TagStory> = tags
+        .into_iter()
+        .map(|tag_id| TagStory {
+            tag_id,
+            story_id: entry.id,
+        })
+        .collect();
+
+    insert_into(tags_stories::table)
+        .values(&tag_relations)
         .execute(&mut conn)
         .map_err(internal_error)?;
 

@@ -10,6 +10,7 @@ pub struct NewStorySerializer {
     pub title: String,
     pub content: String,
     pub category_id: Option<i32>,
+    pub tags: Vec<i32>,
 }
 
 impl NewStorySerializer {

@@ -16,7 +16,7 @@ pub struct Tag {
     pub name: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Identifiable, Selectable, Queryable, Associations)]
+#[derive(Debug, PartialEq, Eq, Identifiable, Selectable, Queryable, Associations, Insertable)]
 #[diesel(belongs_to(Tag))]
 #[diesel(belongs_to(Story))]
 #[diesel(table_name = tags_stories)]
