@@ -1,4 +1,5 @@
 use axum::extract::Path;
+use axum::extract::Query;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -12,6 +13,7 @@ use super::bad_request;
 use super::forbidden;
 use super::internal_error;
 use super::Error;
+use super::Pagination;
 use super::Response;
 use crate::db::establish_connection;
 use crate::news::auth::authenticate;
@@ -24,17 +26,22 @@ use crate::news::models::User;
 use crate::news::models::UserSerializer;
 use crate::schema::users;
 
-pub async fn get_users() -> Result<Json<Vec<UserSerializer>>, Error> {
+pub async fn get_users(
+    Query(pagination): Query<Pagination>,
+) -> Result<Json<Vec<UserSerializer>>, Error> {
+    let pagination = pagination.configure();
     let mut conn = establish_connection();
 
-    let news: Vec<User> = users::table
+    let users: Vec<User> = users::table
         .order(users::columns::id.asc())
+        .offset(pagination.offset)
+        .limit(pagination.limit)
         .load::<User>(&mut conn)
         .map_err(internal_error)?;
 
-    let news: Vec<UserSerializer> = news.into_iter().map(UserSerializer::from_user).collect();
+    let users: Vec<UserSerializer> = users.into_iter().map(UserSerializer::from_user).collect();
 
-    Ok(news.into())
+    Ok(users.into())
 }
 
 pub async fn create_user(claims: AuthBasic, user: Json<NewUserSerializer>) -> Response {

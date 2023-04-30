@@ -1,4 +1,5 @@
 use axum::extract::Path;
+use axum::extract::Query;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -10,6 +11,7 @@ use diesel::update;
 use super::forbidden;
 use super::internal_error;
 use super::Error;
+use super::Pagination;
 use super::Response;
 use crate::db::establish_connection;
 use crate::news::auth::authenticate;
@@ -26,12 +28,15 @@ use crate::schema::stories;
 use crate::schema::stories::dsl::*;
 use crate::schema::tags_stories;
 
-pub async fn get_stories() -> Result<Json<Vec<Story>>, Error> {
+pub async fn get_stories(Query(pagination): Query<Pagination>) -> Result<Json<Vec<Story>>, Error> {
+    let pagination = pagination.configure();
     let mut conn = establish_connection();
 
     let news = stories::table
         .filter(is_published.eq(true))
         .order(stories::columns::id.asc())
+        .offset(pagination.offset)
+        .limit(pagination.limit)
         .load::<Story>(&mut conn)
         .map_err(internal_error)?;
 
