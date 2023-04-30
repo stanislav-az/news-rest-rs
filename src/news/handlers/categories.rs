@@ -33,19 +33,18 @@ pub async fn get_categories(
     let limit = pagination.limit.try_into().map_err(bad_request)?;
     let mut conn = establish_connection();
 
-    let entries: HashMap<i32, Category> = categories::table
+    let entries: Vec<Category> = categories::table
         .order(categories::columns::id.asc())
         .load::<Category>(&mut conn)
-        .map_err(internal_error)?
-        .into_iter()
-        .map(|c| (c.id, c))
-        .collect();
+        .map_err(internal_error)?;
+
+    let dict: HashMap<i32, &Category> = entries.iter().map(|c| (c.id, c)).collect();
 
     let cats: Vec<CategoryNested> = entries
-        .values()
+        .iter()
         .skip(offset)
         .take(limit)
-        .map(|c| nest(c, &entries))
+        .map(|c| nest(c, &dict))
         .collect();
 
     Ok(cats.into())
