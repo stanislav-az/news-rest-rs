@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use diesel::{AsChangeset, Associations, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
-use super::{Category, User};
+use super::{nest, Category, CategoryNested, Tag, User, UserSerializer};
 use crate::schema::*;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,9 +64,7 @@ pub struct NewStory {
 }
 
 #[derive(
-    Debug, PartialEq, Eq,
-    Queryable, Selectable, Identifiable, Associations,
-    Serialize, Deserialize,
+    Debug, PartialEq, Eq, Queryable, Selectable, Identifiable, Associations, Serialize, Deserialize,
 )]
 #[diesel(belongs_to(User))]
 #[diesel(belongs_to(Category))]
@@ -77,4 +77,39 @@ pub struct Story {
     pub creation_timestamp: DateTime<Utc>,
     pub user_id: i32,
     pub category_id: Option<i32>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StoryNested {
+    pub id: i32,
+    pub title: String,
+    pub content: String,
+    pub is_published: bool,
+    pub creation_timestamp: DateTime<Utc>,
+    pub user: UserSerializer,
+    pub category: Option<CategoryNested>,
+    pub tags: Vec<Tag>,
+}
+
+impl StoryNested {
+    pub fn from_tuple(
+        t: (Story, User, Option<Category>, Vec<Tag>),
+        categories_dict: &HashMap<i32, &Category>,
+    ) -> StoryNested {
+        let story = t.0;
+        let user = t.1;
+        let category = t.2.map(|c| nest(&c, categories_dict));
+        let tags = t.3;
+
+        StoryNested {
+            id: story.id,
+            title: story.title,
+            content: story.content,
+            is_published: story.is_published,
+            creation_timestamp: story.creation_timestamp,
+            user: UserSerializer::from_user(user),
+            category,
+            tags,
+        }
+    }
 }

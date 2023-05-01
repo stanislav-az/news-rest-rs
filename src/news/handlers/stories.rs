@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::http;
@@ -18,27 +20,67 @@ use crate::news::auth::authenticate;
 use crate::news::auth::authorize_author;
 use crate::news::auth::authorize_self;
 use crate::news::auth::authorize_self_or_admin;
+use crate::news::models::Category;
 use crate::news::models::NewStory;
 use crate::news::models::NewStorySerializer;
 use crate::news::models::Story;
+use crate::news::models::StoryNested;
+use crate::news::models::Tag;
 use crate::news::models::TagStory;
 use crate::news::models::UpdatableStory;
 use crate::news::models::UpdatableStorySerializer;
+use crate::news::models::User;
+use crate::schema::categories;
 use crate::schema::stories;
 use crate::schema::stories::dsl::*;
+use crate::schema::tags;
 use crate::schema::tags_stories;
+use crate::schema::users;
 
-pub async fn get_stories(Query(pagination): Query<Pagination>) -> Result<Json<Vec<Story>>, Error> {
+pub async fn get_stories(
+    Query(pagination): Query<Pagination>,
+) -> Result<Json<Vec<StoryNested>>, Error> {
     let pagination = pagination.configure();
     let mut conn = establish_connection();
 
-    let news = stories::table
+    let news: Vec<(Story, User, Option<Category>)> = stories::table
         .filter(is_published.eq(true))
+        .inner_join(users::table)
+        .left_join(categories::table)
         .order(stories::columns::id.asc())
         .offset(pagination.offset)
         .limit(pagination.limit)
-        .load::<Story>(&mut conn)
+        .select((
+            Story::as_select(),
+            User::as_select(),
+            Option::<Category>::as_select(),
+        ))
+        .load(&mut conn)
         .map_err(internal_error)?;
+
+    let cats: Vec<Category> = categories::table
+        .order(categories::columns::id.asc())
+        .load::<Category>(&mut conn)
+        .map_err(internal_error)?;
+    let cats_dict: HashMap<i32, &Category> = cats.iter().map(|c| (c.id, c)).collect();
+
+    let storys: Vec<&Story> = news.iter().map(|t| &t.0).collect();
+    let tags: Vec<(TagStory, Tag)> = TagStory::belonging_to(&storys)
+        .inner_join(tags::table)
+        .select((TagStory::as_select(), Tag::as_select()))
+        .load(&mut conn)
+        .map_err(internal_error)?;
+    let news: Vec<(Story, User, Option<Category>, Vec<Tag>)> = tags
+        .grouped_by(&storys)
+        .into_iter()
+        .zip(news)
+        .map(|(tgs, (s, u, c))| (s, u, c, tgs.into_iter().map(|(_, t)| t).collect()))
+        .collect();
+
+    let news: Vec<StoryNested> = news
+        .into_iter()
+        .map(|t| StoryNested::from_tuple(t, &cats_dict))
+        .collect();
 
     Ok(news.into())
 }
