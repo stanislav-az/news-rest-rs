@@ -4,6 +4,7 @@ pub mod tags;
 pub mod users;
 
 use axum::http::StatusCode;
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 
 pub use categories::*;
@@ -54,4 +55,22 @@ impl Pagination {
             limit: self.limit.unwrap_or(default_limit),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CreationDateFilter {
+    CreationDateAt(NaiveDate),
+    CreationDateUntil(NaiveDate),
+    CreationDateSince(NaiveDate),
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Filters {
+    pub author_name: Option<String>,
+    pub category_id: Option<i32>,
+    #[serde(flatten)]
+    pub creation_date: Option<CreationDateFilter>,
+    pub title_ilike: Option<String>,
+    pub content_ilike: Option<String>,
 }

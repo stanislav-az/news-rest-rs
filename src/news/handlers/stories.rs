@@ -5,6 +5,7 @@ use axum::extract::Query;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
+use chrono::NaiveTime;
 use diesel::delete;
 use diesel::insert_into;
 use diesel::prelude::*;
@@ -12,7 +13,9 @@ use diesel::update;
 
 use super::forbidden;
 use super::internal_error;
+use super::CreationDateFilter;
 use super::Error;
+use super::Filters;
 use super::Pagination;
 use super::Response;
 use crate::db::establish_connection;
@@ -39,22 +42,67 @@ use crate::schema::users;
 
 pub async fn get_stories(
     Query(pagination): Query<Pagination>,
+    Query(filters): Query<Filters>,
 ) -> Result<Json<Vec<StoryNested>>, Error> {
     let pagination = pagination.configure();
     let mut conn = establish_connection();
 
-    let news: Vec<(Story, User, Option<Category>)> = stories::table
+    let mut news_sql = stories::table
         .filter(is_published.eq(true))
         .inner_join(users::table)
         .left_join(categories::table)
+        .left_join(tags_stories::table.inner_join(tags::table))
         .order(stories::columns::id.asc())
         .offset(pagination.offset)
         .limit(pagination.limit)
+        .into_boxed();
+
+    if let Some(author_name) = filters.author_name {
+        news_sql = news_sql.filter(users::columns::name.eq(author_name));
+    }
+
+    if let Some(cat_id) = filters.category_id {
+        news_sql = news_sql.filter(categories::columns::id.eq(cat_id));
+    }
+
+    if let Some(creation_date) = filters.creation_date {
+        let day_start = NaiveTime::from_num_seconds_from_midnight_opt(0, 0).unwrap();
+        let day_end = NaiveTime::from_num_seconds_from_midnight_opt(86399, 1_999_999_999).unwrap();
+        match creation_date {
+            CreationDateFilter::CreationDateAt(date_at) => {
+                let dt_lower = date_at.and_time(day_start);
+                let dt_upper = date_at.and_time(day_end);
+
+                news_sql = news_sql.filter(creation_timestamp.between(dt_lower, dt_upper))
+            }
+            CreationDateFilter::CreationDateUntil(date_at) => {
+                let date_time = date_at.and_time(day_end);
+
+                news_sql = news_sql.filter(creation_timestamp.le(date_time))
+            }
+            CreationDateFilter::CreationDateSince(date_at) => {
+                let date_time = date_at.and_time(day_start);
+
+                news_sql = news_sql.filter(creation_timestamp.ge(date_time))
+            }
+        }
+    }
+
+    if let Some(title_ilike) = filters.title_ilike {
+        news_sql = news_sql.filter(title.ilike(title_ilike));
+    }
+
+    if let Some(content_ilike) = filters.content_ilike {
+        news_sql = news_sql.filter(content.ilike(content_ilike));
+    }
+
+    let news: Vec<(Story, User, Option<Category>)> = news_sql
         .select((
             Story::as_select(),
             User::as_select(),
             Option::<Category>::as_select(),
         ))
+        .distinct()
         .load(&mut conn)
         .map_err(internal_error)?;
 
