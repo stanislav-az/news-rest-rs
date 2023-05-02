@@ -96,6 +96,12 @@ pub async fn get_stories(
         news_sql = news_sql.filter(content.ilike(content_ilike));
     }
 
+    if let Some(tag_in) = filters.tag_in {
+        let tag_in: Vec<String> = tag_in.split(',').map(String::from).collect();
+
+        news_sql = news_sql.filter(tags::columns::name.eq_any(tag_in));
+    }
+
     let news: Vec<(Story, User, Option<Category>)> = news_sql
         .select((
             Story::as_select(),

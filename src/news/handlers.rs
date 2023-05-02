@@ -73,4 +73,8 @@ pub struct Filters {
     pub creation_date: Option<CreationDateFilter>,
     pub title_ilike: Option<String>,
     pub content_ilike: Option<String>,
+    // Can't make Vec<String> work:
+    // https://github.com/tokio-rs/axum/discussions/1719
+    // https://github.com/jplatte/serde_html_form/issues/6
+    pub tag_in: Option<String>,
 }
