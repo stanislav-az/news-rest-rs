@@ -11,6 +11,8 @@ use diesel::insert_into;
 use diesel::prelude::*;
 use diesel::update;
 
+use super::SortBySelector;
+use super::Sorting;
 use super::forbidden;
 use super::internal_error;
 use super::CreationDateFilter;
@@ -43,6 +45,7 @@ use crate::schema::users;
 pub async fn get_stories(
     Query(pagination): Query<Pagination>,
     Query(filters): Query<Filters>,
+    Query(sorting): Query<Sorting>,
 ) -> Result<Json<Vec<StoryNested>>, Error> {
     let pagination = pagination.configure();
     let mut conn = establish_connection();
@@ -100,6 +103,15 @@ pub async fn get_stories(
         let tag_in: Vec<String> = tag_in.split(',').map(String::from).collect();
 
         news_sql = news_sql.filter(tags::columns::name.eq_any(tag_in));
+    }
+
+    if let Some(sorting) = sorting.sort_by {
+        match sorting {
+            SortBySelector::Author => news_sql = news_sql.order(users::columns::name.asc()),
+            SortBySelector::Category => news_sql = news_sql.order(categories::columns::name.asc()),
+            SortBySelector::CreationTimestampAsc => news_sql = news_sql.order(creation_timestamp.asc()),
+            SortBySelector::CreationTimestampDesc => news_sql = news_sql.order(creation_timestamp.desc()),
+        }
     }
 
     let news: Vec<(Story, User, Option<Category>)> = news_sql

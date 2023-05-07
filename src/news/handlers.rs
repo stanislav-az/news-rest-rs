@@ -78,3 +78,17 @@ pub struct Filters {
     // https://github.com/jplatte/serde_html_form/issues/6
     pub tag_in: Option<String>,
 }
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SortBySelector {
+    Author,
+    Category,
+    CreationTimestampAsc,
+    CreationTimestampDesc,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sorting {
+    pub sort_by: Option<SortBySelector>,
+}
