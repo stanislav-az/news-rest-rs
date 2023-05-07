@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use diesel::{AsChangeset, Associations, Identifiable, Insertable, Queryable, Selectable};
 use serde::{Deserialize, Serialize};
 
-use super::{nest, Category, CategoryNested, Tag, User, UserSerializer};
+use super::{nest_category, Category, CategoryNested, Tag, User, UserSerializer};
 use crate::schema::*;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,7 +98,7 @@ impl StoryNested {
     ) -> StoryNested {
         let story = t.0;
         let user = t.1;
-        let category = t.2.map(|c| nest(&c, categories_dict));
+        let category = t.2.map(|c| nest_category(&c, categories_dict));
         let tags = t.3;
 
         StoryNested {

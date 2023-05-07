@@ -18,7 +18,7 @@ use super::Response;
 use crate::db::establish_connection;
 use crate::news::auth::authenticate;
 use crate::news::auth::authorize_admin;
-use crate::news::models::nest;
+use crate::news::models::nest_category;
 use crate::news::models::Category;
 use crate::news::models::CategoryNested;
 use crate::news::models::NewCategory;
@@ -44,7 +44,7 @@ pub async fn get_categories(
         .iter()
         .skip(offset)
         .take(limit)
-        .map(|c| nest(c, &dict))
+        .map(|c| nest_category(c, &dict))
         .collect();
 
     Ok(cats.into())

@@ -11,8 +11,6 @@ use diesel::insert_into;
 use diesel::prelude::*;
 use diesel::update;
 
-use super::SortBySelector;
-use super::Sorting;
 use super::forbidden;
 use super::internal_error;
 use super::CreationDateFilter;
@@ -20,6 +18,8 @@ use super::Error;
 use super::Filters;
 use super::Pagination;
 use super::Response;
+use super::SortBySelector;
+use super::Sorting;
 use crate::db::establish_connection;
 use crate::news::auth::authenticate;
 use crate::news::auth::authorize_author;
@@ -109,8 +109,12 @@ pub async fn get_stories(
         match sorting {
             SortBySelector::Author => news_sql = news_sql.order(users::columns::name.asc()),
             SortBySelector::Category => news_sql = news_sql.order(categories::columns::name.asc()),
-            SortBySelector::CreationTimestampAsc => news_sql = news_sql.order(creation_timestamp.asc()),
-            SortBySelector::CreationTimestampDesc => news_sql = news_sql.order(creation_timestamp.desc()),
+            SortBySelector::CreationTimestampAsc => {
+                news_sql = news_sql.order(creation_timestamp.asc())
+            }
+            SortBySelector::CreationTimestampDesc => {
+                news_sql = news_sql.order(creation_timestamp.desc())
+            }
         }
     }
 
@@ -124,29 +128,61 @@ pub async fn get_stories(
         .load(&mut conn)
         .map_err(internal_error)?;
 
-    let cats: Vec<Category> = categories::table
-        .order(categories::columns::id.asc())
-        .load::<Category>(&mut conn)
-        .map_err(internal_error)?;
-    let cats_dict: HashMap<i32, &Category> = cats.iter().map(|c| (c.id, c)).collect();
+    let news: Vec<StoryNested> = nest_stories(news)?;
 
-    let storys: Vec<&Story> = news.iter().map(|t| &t.0).collect();
-    let tags: Vec<(TagStory, Tag)> = TagStory::belonging_to(&storys)
-        .inner_join(tags::table)
-        .select((TagStory::as_select(), Tag::as_select()))
+    Ok(news.into())
+}
+
+pub async fn search_stories(
+    Path(search_query): Path<String>,
+    Query(pagination): Query<Pagination>,
+    Query(sorting): Query<Sorting>,
+) -> Result<Json<Vec<StoryNested>>, Error> {
+    let pagination = pagination.configure();
+    let mut conn = establish_connection();
+
+    let mut news_sql = stories::table
+        .filter(is_published.eq(true))
+        .inner_join(users::table)
+        .left_join(categories::table)
+        .left_join(tags_stories::table.inner_join(tags::table))
+        .filter(
+            title
+                .ilike(&search_query)
+                .or(content.ilike(&search_query))
+                .or(categories::columns::name.ilike(&search_query))
+                .or(tags::columns::name.ilike(&search_query))
+                .or(users::columns::name.ilike(&search_query))
+        )
+        .order(stories::columns::id.asc())
+        .offset(pagination.offset)
+        .limit(pagination.limit)
+        .into_boxed();
+
+    if let Some(sorting) = sorting.sort_by {
+        match sorting {
+            SortBySelector::Author => news_sql = news_sql.order(users::columns::name.asc()),
+            SortBySelector::Category => news_sql = news_sql.order(categories::columns::name.asc()),
+            SortBySelector::CreationTimestampAsc => {
+                news_sql = news_sql.order(creation_timestamp.asc())
+            }
+            SortBySelector::CreationTimestampDesc => {
+                news_sql = news_sql.order(creation_timestamp.desc())
+            }
+        }
+    }
+
+    let news: Vec<(Story, User, Option<Category>)> = news_sql
+        .select((
+            Story::as_select(),
+            User::as_select(),
+            Option::<Category>::as_select(),
+        ))
+        .distinct()
         .load(&mut conn)
         .map_err(internal_error)?;
-    let news: Vec<(Story, User, Option<Category>, Vec<Tag>)> = tags
-        .grouped_by(&storys)
-        .into_iter()
-        .zip(news)
-        .map(|(tgs, (s, u, c))| (s, u, c, tgs.into_iter().map(|(_, t)| t).collect()))
-        .collect();
 
-    let news: Vec<StoryNested> = news
-        .into_iter()
-        .map(|t| StoryNested::from_tuple(t, &cats_dict))
-        .collect();
+    let news: Vec<StoryNested> = nest_stories(news)?;
 
     Ok(news.into())
 }
@@ -305,4 +341,33 @@ pub async fn delete_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Re
     }
 
     Ok(http::StatusCode::NO_CONTENT)
+}
+
+fn nest_stories(news: Vec<(Story, User, Option<Category>)>) -> Result<Vec<StoryNested>, Error> {
+    let mut conn = establish_connection();
+
+    let cats: Vec<Category> = categories::table
+        .order(categories::columns::id.asc())
+        .load::<Category>(&mut conn)
+        .map_err(internal_error)?;
+    let cats_dict: HashMap<i32, &Category> = cats.iter().map(|c| (c.id, c)).collect();
+
+    let storys: Vec<&Story> = news.iter().map(|t| &t.0).collect();
+    let tags: Vec<(TagStory, Tag)> = TagStory::belonging_to(&storys)
+        .inner_join(tags::table)
+        .select((TagStory::as_select(), Tag::as_select()))
+        .load(&mut conn)
+        .map_err(internal_error)?;
+    let news: Vec<(Story, User, Option<Category>, Vec<Tag>)> = tags
+        .grouped_by(&storys)
+        .into_iter()
+        .zip(news)
+        .map(|(tgs, (s, u, c))| (s, u, c, tgs.into_iter().map(|(_, t)| t).collect()))
+        .collect();
+
+    let news: Vec<StoryNested> = news
+        .into_iter()
+        .map(|t| StoryNested::from_tuple(t, &cats_dict))
+        .collect();
+    Ok(news)
 }
