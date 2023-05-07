@@ -42,6 +42,7 @@ use crate::schema::tags;
 use crate::schema::tags_stories;
 use crate::schema::users;
 
+// TODO query & nesting should happen inside one transaction
 pub async fn get_stories(
     Query(pagination): Query<Pagination>,
     Query(filters): Query<Filters>,
@@ -133,6 +134,7 @@ pub async fn get_stories(
     Ok(news.into())
 }
 
+// TODO query & nesting should happen inside one transaction
 pub async fn search_stories(
     Path(search_query): Path<String>,
     Query(pagination): Query<Pagination>,
