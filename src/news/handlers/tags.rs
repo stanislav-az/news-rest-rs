@@ -1,4 +1,5 @@
 use axum::extract::Path;
+use axum::extract::Query;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -9,6 +10,7 @@ use diesel::prelude::*;
 use super::forbidden;
 use super::internal_error;
 use super::Error;
+use super::Pagination;
 use super::Response;
 use crate::db::establish_connection;
 use crate::news::auth::authenticate;
@@ -18,11 +20,14 @@ use crate::news::models::NewTag;
 use crate::news::models::Tag;
 use crate::schema::tags;
 
-pub async fn get_tags() -> Result<Json<Vec<Tag>>, Error> {
+pub async fn get_tags(Query(pagination): Query<Pagination>) -> Result<Json<Vec<Tag>>, Error> {
+    let pagination = pagination.configure();
     let mut conn = establish_connection();
 
     let tags: Vec<Tag> = tags::table
         .order(tags::columns::id.asc())
+        .offset(pagination.offset)
+        .limit(pagination.limit)
         .load::<Tag>(&mut conn)
         .map_err(internal_error)?;
 

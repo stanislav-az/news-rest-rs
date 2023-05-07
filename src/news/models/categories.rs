@@ -13,10 +13,10 @@ pub struct CategoryNested {
     pub parent: Option<Box<CategoryNested>>,
 }
 
-pub fn nest(origin: &Category, flat_dict: &HashMap<i32, Category>) -> CategoryNested {
+pub fn nest_category(origin: &Category, flat_dict: &HashMap<i32, &Category>) -> CategoryNested {
     let parent = origin.parent_id.map(|pid| {
-        let flat_parent = &flat_dict[&pid];
-        Box::new(nest(flat_parent, flat_dict))
+        let flat_parent = flat_dict[&pid];
+        Box::new(nest_category(flat_parent, flat_dict))
     });
 
     CategoryNested {

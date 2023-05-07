@@ -4,10 +4,15 @@ pub mod tags;
 pub mod users;
 
 use axum::http::StatusCode;
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+
 pub use categories::*;
 pub use stories::*;
 pub use tags::*;
 pub use users::*;
+
+use super::config::{load_default_limit, ConfiguredPagination};
 
 pub type Error = (StatusCode, String);
 
@@ -34,4 +39,56 @@ where
     E: std::error::Error,
 {
     (StatusCode::FORBIDDEN, err.to_string())
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Pagination {
+    pub offset: Option<i64>,
+    pub limit: Option<i64>,
+}
+
+impl Pagination {
+    pub fn configure(self) -> ConfiguredPagination {
+        let default_limit = load_default_limit();
+        ConfiguredPagination {
+            offset: self.offset.unwrap_or(0),
+            limit: self.limit.unwrap_or(default_limit),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CreationDateFilter {
+    CreationDateAt(NaiveDate),
+    CreationDateUntil(NaiveDate),
+    CreationDateSince(NaiveDate),
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Filters {
+    pub author_name: Option<String>,
+    pub category_id: Option<i32>,
+    #[serde(flatten)]
+    pub creation_date: Option<CreationDateFilter>,
+    pub title_ilike: Option<String>,
+    pub content_ilike: Option<String>,
+    // Can't make Vec<String> work:
+    // https://github.com/tokio-rs/axum/discussions/1719
+    // https://github.com/jplatte/serde_html_form/issues/6
+    pub tag_in: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SortBySelector {
+    Author,
+    Category,
+    CreationTimestampAsc,
+    CreationTimestampDesc,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sorting {
+    pub sort_by: Option<SortBySelector>,
 }
