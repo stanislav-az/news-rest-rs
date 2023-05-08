@@ -6,6 +6,7 @@ use tower_http::trace::DefaultOnRequest;
 use tower_http::trace::DefaultOnResponse;
 use tower_http::trace::TraceLayer;
 use tracing::Level;
+use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use dotenv::dotenv;
 
@@ -49,6 +50,8 @@ async fn main() {
                 .on_response(DefaultOnResponse::new().level(Level::INFO))
                 .on_failure(DefaultOnFailure::new().level(Level::WARN)),
         );
+
+    info!("Starting axum server at http://localhost:3000. To quit hit ctrl+c.");
 
     // Run our application as a hyper server on http://localhost:3000.
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
