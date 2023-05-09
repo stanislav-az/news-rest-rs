@@ -1,0 +1,1 @@
+curl --location --request GET 'localhost:3000/api/categories?limit=3&offset=0'

@@ -1,0 +1,1 @@
+curl --location --request GET 'localhost:3000/api/stories/search/%25stan%25?offset=1&limit=5&sort_by=author&sort_by=category&sort_by=creation_timestamp_asc&sort_by=creation_timestamp_desc'
