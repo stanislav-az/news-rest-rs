@@ -1,20 +1,44 @@
 use axum::http;
 use axum::routing;
+use dotenv::dotenv;
+use std::env;
+use std::fs::File;
 use tower_http::trace::DefaultMakeSpan;
 use tower_http::trace::DefaultOnFailure;
 use tower_http::trace::DefaultOnRequest;
 use tower_http::trace::DefaultOnResponse;
 use tower_http::trace::TraceLayer;
-use tracing::Level;
 use tracing::info;
+use tracing::Level;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use dotenv::dotenv;
 
 use news_rest_rs::news::handlers;
 
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    let log_to_stdout: bool = env::var("LOG_TO_STDOUT")
+        .expect("LOG_TO_STDOUT must be set")
+        .parse()
+        .expect("LOG_TO_STDOUT should be boolean: true/false");
+    let log_to_stdout = if log_to_stdout {
+        Some(tracing_subscriber::fmt::layer())
+    } else {
+        None
+    };
+    let log_to_file = env::var("LOG_TO_FILE").ok();
+    let log_to_file = log_to_file.map_or(None, |path| {
+        if !path.is_empty() {
+            let f = File::options()
+                .append(true)
+                .create(true)
+                .open(&path)
+                .expect(&format!("Could not open log file on path {}", &path));
+            Some(tracing_subscriber::fmt::layer().json().with_writer(f))
+        } else {
+            None
+        }
+    });
 
     tracing_subscriber::registry()
         .with(
@@ -22,7 +46,8 @@ async fn main() {
                 "news_rest_rs=trace,tower_http=trace,axum::rejection=trace".into()
             }),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(log_to_stdout)
+        .with(log_to_file)
         .init();
 
     let app = axum::Router::new()
