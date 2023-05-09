@@ -1,0 +1,2 @@
+curl --location --request GET 'localhost:3000/api/stories?offset=1&limit=5&author_name=Stanislav&category_id=6&creation_date_since=2023-02-27&creation_date_until=2023-04-22&creation_date_at=2023-04-22&title_ilike=%25ada%25&content_ilike=%25Very%25&tag_in=cryptocurrency,cardano&sort_by=author&sort_by=category&sort_by=creation_timestamp_asc&sort_by=creation_timestamp_desc' \
+--data-raw ''
