@@ -6,6 +6,7 @@ use diesel::result::Error as DieselErr;
 use dotenv::dotenv;
 use std::error::Error as StdErr;
 use std::{env, fmt};
+use tracing::{info, info_span, warn};
 
 use super::handlers::Error;
 use super::models::User;
@@ -52,6 +53,10 @@ impl AuthenticationError {
 }
 
 pub fn authenticate(AuthBasic((login, password)): AuthBasic) -> Result<User, AuthenticationError> {
+    let span = info_span!("Authentication");
+    // TODO if this function ever becomes async entering the span will not work correctly
+    let _enter = span.enter();
+
     let password = password.ok_or(AuthenticationError::NoPasswordProvided)?;
     let mut conn = establish_connection();
 
@@ -62,14 +67,21 @@ pub fn authenticate(AuthBasic((login, password)): AuthBasic) -> Result<User, Aut
         .map_err(AuthenticationError::DatabaseError)?;
 
     match user {
-        None => Err(AuthenticationError::UserNotFound),
+        None => {
+            warn!("User login {} not found", login);
+            Err(AuthenticationError::UserNotFound)
+        }
         Some(user) => {
+            info!("User id {} wants too authenticate", user.id);
             let salt = load_salt();
             let mut credential = [0u8; pbkdf2::CREDENTIAL_LEN];
             credential.copy_from_slice(&user.password[..pbkdf2::CREDENTIAL_LEN]);
 
-            pbkdf2::verify_password(&salt, &login, &password, &credential)
-                .map_err(|_| AuthenticationError::WrongUsernameOrPassword)?;
+            pbkdf2::verify_password(&salt, &login, &password, &credential).map_err(|_| {
+                warn!("User id {} password verification failed", user.id);
+                AuthenticationError::WrongUsernameOrPassword
+            })?;
+            info!("User id {} password verification success", user.id);
 
             Ok(user)
         }
