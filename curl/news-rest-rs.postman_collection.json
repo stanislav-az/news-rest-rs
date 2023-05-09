@@ -176,10 +176,10 @@
 						}
 					]
 				},
-				"method": "PATCH",
+				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "localhost:3000/api/stories/publish/1",
+					"raw": "localhost:3000/api/stories/1",
 					"host": [
 						"localhost"
 					],
@@ -187,7 +187,6 @@
 					"path": [
 						"api",
 						"stories",
-						"publish",
 						"1"
 					]
 				}
