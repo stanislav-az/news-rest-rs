@@ -10,7 +10,7 @@ axum = { version = "0.6.18", features = ["tracing"] }
 axum-auth = "0.4.0"
 base64 = "0.21.0"
 chrono = { version = "0.4.23", features = ["serde"] }
-diesel = { version = "2.0.3", features = ["postgres", "uuid", "chrono"] }
+diesel = { version = "2.0.3", features = ["postgres", "uuid", "chrono", "r2d2"] }
 diesel_migrations = "2.0.0"
 dotenv = "0.15.0"
 ring = "0.16.20"

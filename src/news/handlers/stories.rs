@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use axum::extract::Path;
 use axum::extract::Query;
+use axum::extract::State;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -20,7 +21,7 @@ use super::Pagination;
 use super::Response;
 use super::SortBySelector;
 use super::Sorting;
-use crate::db::establish_connection;
+use crate::db::ConnectionPool;
 use crate::news::auth::authenticate;
 use crate::news::auth::authorize_author;
 use crate::news::auth::authorize_self;
@@ -44,12 +45,13 @@ use crate::schema::users;
 
 // TODO query & nesting should happen inside one transaction
 pub async fn get_stories(
+    State(pool): State<ConnectionPool>,
     Query(pagination): Query<Pagination>,
     Query(filters): Query<Filters>,
     Query(sorting): Query<Sorting>,
 ) -> Result<Json<Vec<StoryNested>>, Error> {
     let pagination = pagination.configure();
-    let mut conn = establish_connection();
+    let mut conn = pool.get().map_err(internal_error)?;
 
     let mut news_sql = stories::table
         .filter(is_published.eq(true))
@@ -129,19 +131,20 @@ pub async fn get_stories(
         .load(&mut conn)
         .map_err(internal_error)?;
 
-    let news: Vec<StoryNested> = nest_stories(news)?;
+    let news: Vec<StoryNested> = nest_stories(&mut conn, news)?;
 
     Ok(news.into())
 }
 
 // TODO query & nesting should happen inside one transaction
 pub async fn search_stories(
+    State(pool): State<ConnectionPool>,
     Path(search_query): Path<String>,
     Query(pagination): Query<Pagination>,
     Query(sorting): Query<Sorting>,
 ) -> Result<Json<Vec<StoryNested>>, Error> {
     let pagination = pagination.configure();
-    let mut conn = establish_connection();
+    let mut conn = pool.get().map_err(internal_error)?;
 
     let mut news_sql = stories::table
         .filter(is_published.eq(true))
@@ -154,7 +157,7 @@ pub async fn search_stories(
                 .or(content.ilike(&search_query))
                 .or(categories::columns::name.ilike(&search_query))
                 .or(tags::columns::name.ilike(&search_query))
-                .or(users::columns::name.ilike(&search_query))
+                .or(users::columns::name.ilike(&search_query)),
         )
         .order(stories::columns::id.asc())
         .offset(pagination.offset)
@@ -184,18 +187,19 @@ pub async fn search_stories(
         .load(&mut conn)
         .map_err(internal_error)?;
 
-    let news: Vec<StoryNested> = nest_stories(news)?;
+    let news: Vec<StoryNested> = nest_stories(&mut conn, news)?;
 
     Ok(news.into())
 }
 
 pub async fn get_story(
+    State(pool): State<ConnectionPool>,
     claims: AuthBasic,
     Path(id_selector): Path<i32>,
 ) -> Result<Json<Story>, Error> {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
 
     let story: Option<Story> = stories::table
         .find(id_selector)
@@ -213,14 +217,19 @@ pub async fn get_story(
     }
 }
 
-pub async fn create_story(claims: AuthBasic, story_ser: Json<NewStorySerializer>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+pub async fn create_story(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    story_ser: Json<NewStorySerializer>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
+
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
     authorize_author(&actor).map_err(forbidden)?;
 
     let story_ser: NewStorySerializer = story_ser.0;
     let tags: Vec<i32> = story_ser.tags.clone();
     let story: NewStory = story_ser.into_new_story(actor.id);
-    let mut conn = establish_connection();
 
     let entry: Story = insert_into(stories::table)
         .values(&story)
@@ -243,10 +252,14 @@ pub async fn create_story(claims: AuthBasic, story_ser: Json<NewStorySerializer>
     Ok(http::StatusCode::CREATED)
 }
 
-pub async fn publish_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+pub async fn publish_story(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
 
     let story: Option<Story> = stories::table
         .find(id_selector)
@@ -270,17 +283,18 @@ pub async fn publish_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> R
 }
 
 pub async fn update_story(
+    State(pool): State<ConnectionPool>,
     claims: AuthBasic,
     Path(id_selector): Path<i32>,
     updated_story_ser: Json<UpdatableStorySerializer>,
 ) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    let mut conn = pool.get().map_err(internal_error)?;
+
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
 
     let updated_story_ser: UpdatableStorySerializer = updated_story_ser.0;
     let tags = updated_story_ser.tags.clone();
     let updated_story: UpdatableStory = updated_story_ser.into_updatable_story();
-
-    let mut conn = establish_connection();
 
     let story: Option<Story> = stories::table
         .find(id_selector)
@@ -322,10 +336,14 @@ pub async fn update_story(
     Ok(http::StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+pub async fn delete_story(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
 
     let story: Option<Story> = stories::table
         .find(id_selector)
@@ -345,12 +363,13 @@ pub async fn delete_story(claims: AuthBasic, Path(id_selector): Path<i32>) -> Re
     Ok(http::StatusCode::NO_CONTENT)
 }
 
-fn nest_stories(news: Vec<(Story, User, Option<Category>)>) -> Result<Vec<StoryNested>, Error> {
-    let mut conn = establish_connection();
-
+fn nest_stories(
+    conn: &mut PgConnection,
+    news: Vec<(Story, User, Option<Category>)>,
+) -> Result<Vec<StoryNested>, Error> {
     let cats: Vec<Category> = categories::table
         .order(categories::columns::id.asc())
-        .load::<Category>(&mut conn)
+        .load::<Category>(conn)
         .map_err(internal_error)?;
     let cats_dict: HashMap<i32, &Category> = cats.iter().map(|c| (c.id, c)).collect();
 
@@ -358,7 +377,7 @@ fn nest_stories(news: Vec<(Story, User, Option<Category>)>) -> Result<Vec<StoryN
     let tags: Vec<(TagStory, Tag)> = TagStory::belonging_to(&storys)
         .inner_join(tags::table)
         .select((TagStory::as_select(), Tag::as_select()))
-        .load(&mut conn)
+        .load(conn)
         .map_err(internal_error)?;
     let news: Vec<(Story, User, Option<Category>, Vec<Tag>)> = tags
         .grouped_by(&storys)

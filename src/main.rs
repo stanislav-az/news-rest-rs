@@ -1,6 +1,8 @@
 use axum::http;
 use axum::routing;
 use dotenv::dotenv;
+use news_rest_rs::db::ConnectionPool;
+use news_rest_rs::db::init_connection_pool;
 use std::env;
 use std::fs::File;
 use tower_http::trace::DefaultMakeSpan;
@@ -50,6 +52,8 @@ async fn main() {
         .with(log_to_file)
         .init();
 
+    let pool: ConnectionPool = init_connection_pool();
+
     let app = axum::Router::new()
         .fallback(fallback_handler)
         .route("/api/tags/:id", routing::delete(handlers::delete_tag))
@@ -73,7 +77,8 @@ async fn main() {
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO))
                 .on_failure(DefaultOnFailure::new().level(Level::WARN)),
-        );
+        )
+        .with_state(pool);
 
     info!("Starting axum server at http://localhost:3000. To quit hit ctrl+c.");
 

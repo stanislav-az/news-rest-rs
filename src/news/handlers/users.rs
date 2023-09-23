@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::Query;
+use axum::extract::State;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -15,7 +16,7 @@ use super::internal_error;
 use super::Error;
 use super::Pagination;
 use super::Response;
-use crate::db::establish_connection;
+use crate::db::ConnectionPool;
 use crate::news::auth::authenticate;
 use crate::news::auth::authorize_admin;
 use crate::news::auth::authorize_self;
@@ -27,10 +28,11 @@ use crate::news::models::UserSerializer;
 use crate::schema::users;
 
 pub async fn get_users(
+    State(pool): State<ConnectionPool>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<UserSerializer>>, Error> {
     let pagination = pagination.configure();
-    let mut conn = establish_connection();
+    let mut conn = pool.get().map_err(internal_error)?;
 
     let users: Vec<User> = users::table
         .order(users::columns::id.asc())
@@ -44,13 +46,18 @@ pub async fn get_users(
     Ok(users.into())
 }
 
-pub async fn create_user(claims: AuthBasic, user: Json<NewUserSerializer>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+pub async fn create_user(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    user: Json<NewUserSerializer>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
+
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
     authorize_admin(&actor).map_err(forbidden)?;
 
     let user: NewUserSerializer = user.0;
     let user: NewUser = user.into_new_user();
-    let mut conn = establish_connection();
 
     let _res = insert_into(users::table)
         .values(&user)
@@ -61,14 +68,15 @@ pub async fn create_user(claims: AuthBasic, user: Json<NewUserSerializer>) -> Re
 }
 
 pub async fn update_user(
+    State(pool): State<ConnectionPool>,
     claims: AuthBasic,
     Path(id_selector): Path<i32>,
     updated_user: Json<UserSerializer>,
 ) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
-    authorize_self(id_selector, &actor).map_err(forbidden)?;
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
+    authorize_self(id_selector, &actor).map_err(forbidden)?;
 
     let updated_user: UserSerializer = updated_user.0;
 
@@ -95,11 +103,15 @@ pub async fn update_user(
     Ok(http::StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_user(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
-    authorize_self_or_admin(id_selector, &actor).map_err(forbidden)?;
+pub async fn delete_user(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
+    authorize_self_or_admin(id_selector, &actor).map_err(forbidden)?;
 
     let num_rows = delete(
         users::table

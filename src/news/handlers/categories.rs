@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::Query;
+use axum::extract::State;
 use axum::http;
 use axum::Json;
 use axum_auth::AuthBasic;
@@ -15,7 +16,7 @@ use super::internal_error;
 use super::Error;
 use super::Pagination;
 use super::Response;
-use crate::db::establish_connection;
+use crate::db::ConnectionPool;
 use crate::news::auth::authenticate;
 use crate::news::auth::authorize_admin;
 use crate::news::models::nest_category;
@@ -26,12 +27,14 @@ use crate::news::models::UpdatableCategory;
 use crate::schema::categories;
 
 pub async fn get_categories(
+    State(pool): State<ConnectionPool>,
     Query(pagination): Query<Pagination>,
 ) -> Result<Json<Vec<CategoryNested>>, Error> {
     let pagination = pagination.configure();
     let offset = pagination.offset.try_into().map_err(bad_request)?;
     let limit = pagination.limit.try_into().map_err(bad_request)?;
-    let mut conn = establish_connection();
+
+    let mut conn = pool.get().map_err(internal_error)?;
 
     let entries: Vec<Category> = categories::table
         .order(categories::columns::id.asc())
@@ -50,12 +53,17 @@ pub async fn get_categories(
     Ok(cats.into())
 }
 
-pub async fn create_category(claims: AuthBasic, category: Json<NewCategory>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+pub async fn create_category(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    category: Json<NewCategory>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
+
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
     authorize_admin(&actor).map_err(forbidden)?;
 
     let category: NewCategory = category.0;
-    let mut conn = establish_connection();
 
     let _res = insert_into(categories::table)
         .values(&category)
@@ -66,16 +74,17 @@ pub async fn create_category(claims: AuthBasic, category: Json<NewCategory>) -> 
 }
 
 pub async fn update_category(
+    State(pool): State<ConnectionPool>,
     claims: AuthBasic,
     Path(id_selector): Path<i32>,
     updated_category: Json<UpdatableCategory>,
 ) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
+    let mut conn = pool.get().map_err(internal_error)?;
+
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
     authorize_admin(&actor).map_err(forbidden)?;
 
     let updated_category: UpdatableCategory = updated_category.0;
-
-    let mut conn = establish_connection();
 
     let num_rows = update(categories::table.find(id_selector))
         .set(&updated_category)
@@ -89,11 +98,15 @@ pub async fn update_category(
     Ok(http::StatusCode::NO_CONTENT)
 }
 
-pub async fn delete_category(claims: AuthBasic, Path(id_selector): Path<i32>) -> Response {
-    let actor = authenticate(claims).map_err(|e| e.into_error())?;
-    authorize_admin(&actor).map_err(forbidden)?;
+pub async fn delete_category(
+    State(pool): State<ConnectionPool>,
+    claims: AuthBasic,
+    Path(id_selector): Path<i32>,
+) -> Response {
+    let mut conn = pool.get().map_err(internal_error)?;
 
-    let mut conn = establish_connection();
+    let actor = authenticate(claims, &mut conn).map_err(|e| e.into_error())?;
+    authorize_admin(&actor).map_err(forbidden)?;
 
     let num_rows = delete(categories::table.find(id_selector))
         .execute(&mut conn)

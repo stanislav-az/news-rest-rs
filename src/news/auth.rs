@@ -10,7 +10,7 @@ use tracing::{info, info_span, warn};
 
 use super::handlers::Error;
 use super::models::User;
-use crate::{db::establish_connection, schema::users::dsl as users_dsl};
+use crate::schema::users::dsl as users_dsl;
 use crate::{schema::users, services::pbkdf2};
 
 pub fn load_salt() -> pbkdf2::Salt {
@@ -52,17 +52,19 @@ impl AuthenticationError {
     }
 }
 
-pub fn authenticate(AuthBasic((login, password)): AuthBasic) -> Result<User, AuthenticationError> {
+pub fn authenticate(
+    AuthBasic((login, password)): AuthBasic,
+    conn: &mut PgConnection,
+) -> Result<User, AuthenticationError> {
     let span = info_span!("Authentication");
     // TODO if this function ever becomes async entering the span will not work correctly
     let _enter = span.enter();
 
     let password = password.ok_or(AuthenticationError::NoPasswordProvided)?;
-    let mut conn = establish_connection();
 
     let user: Option<User> = users::table
         .filter(users_dsl::login.eq(&login))
-        .get_result(&mut conn)
+        .get_result(conn)
         .optional()
         .map_err(AuthenticationError::DatabaseError)?;
 
